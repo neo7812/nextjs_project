@@ -1,7 +1,6 @@
 // app/api/suggest-questions/route.ts
 
 import { NextResponse } from "next/server";
-import fetch from "node-fetch"; // only needed if Edge runtime or using older Node
 
 
 export async function POST(req: Request) {
