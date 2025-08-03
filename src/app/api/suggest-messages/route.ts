@@ -1,37 +1,47 @@
-import OpenAI from "openai";
-import { OpenAIStream, StreamingTextResponse } from "ai";
-import { NextResponse } from "next/server";
+// app/api/suggest-questions/route.ts
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { NextResponse } from "next/server";
+import fetch from "node-fetch"; // only needed if Edge runtime or using older Node
 
 export const runtime = "edge";
 
 export async function POST(req: Request) {
+  const prompt =
+    "Create a list of three open-ended and engaging questions formatted as a single string. Each question should be separated by '||'. These questions are for an anonymous social messaging platform, like Qooh.me, and should be suitable for a diverse audience. Avoid personal or sensitive topics, focusing instead on universal themes that encourage friendly interaction. For example, your output should be structured like this: 'What’s a hobby you’ve recently started?||If you could have dinner with any historical figure, who would it be?||What’s a simple thing that makes you happy?'. Ensure the questions are intriguing, foster curiosity, and contribute to a positive and welcoming conversational environment.";
+
   try {
-    const prompt =
-      "Create a list of three open-ended and engaging questions formatted as a single string. Each question should be separated by '||'. These questions are for an anonymous social messaging platform, like Qooh.me, and should be suitable for a diverse audience. Avoid personal or sensitive topics, focusing instead on universal themes that encourage friendly interaction. For example, your output should be structured like this: 'What’s a hobby you’ve recently started?||If you could have dinner with any historical figure, who would it be?||What’s a simple thing that makes you happy?'. Ensure the questions are intriguing, foster curiosity, and contribute to a positive and welcoming conversational environment.";
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+    );
 
-    const response = await openai.completions.create({
-      model: "gpt-3.5-turbo-instruct",
-      max_tokens: 400,
-      stream: true,
-      prompt,
-    });
+    type GeminiResponse = {
+      candidates?: {
+        content?: {
+          parts?: { text?: string }[];
+        };
+      }[];
+    };
 
-    const stream = OpenAIStream(response);
+    const data = (await res.json()) as GeminiResponse;
 
-    return new StreamingTextResponse(stream);
-  } catch (error) {
-    if (error instanceof OpenAI.APIError) {
-      // OpenAI API error handling
-      const { name, status, headers, message } = error;
-      return NextResponse.json({ name, status, headers, message }, { status });
-    } else {
-      // General error handling
-      console.error("An unexpected error occurred:", error);
-      throw error;
+    const output = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!output) {
+      return NextResponse.json({ success: false, message: "No questions generated" }, { status: 500 });
     }
+
+    return NextResponse.json({ success: true, questions: output }, { status: 200 });
+  } catch (error) {
+    console.error("Gemini error:", error);
+    return NextResponse.json({ success: false, message: "AI generation failed" }, { status: 500 });
   }
 }
