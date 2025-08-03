@@ -3,7 +3,6 @@
 import { NextResponse } from "next/server";
 import fetch from "node-fetch"; // only needed if Edge runtime or using older Node
 
-export const runtime = "edge";
 
 export async function POST(req: Request) {
   const prompt =
